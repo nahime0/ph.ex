@@ -3,41 +3,45 @@
 class phex
 {
 	
-	private $VERSION = "0.0.1";
-	private $_PHEX;
-	public $_ROUTES;
+	static $VERSION = "0.0.1";
+	static $_PHEX;
+	static $_ROUTES;
+	static $loaded = false;
 	
 	
-	public function __construct()
+	public function load()
 	{
-		$this->_PHEX = array(
-			'VERSION' => $this->VERSION,
-			'AUTOLOAD' => "autoload/"
-		);
-	}
-	
-	/**
-	
-	**/
-	public function __call($method, $arguments) {
-		
-	}
-	
-	/**
-		Move next 4 methods into __call method
-	**/
-	public function routeGET($req_route, $callback)
-	{
-		if($_SERVER['REQUEST_METHOD'] == "GET")
+		if(!self::$loaded)
 		{
-			$this->route($req_route, $callback);
+			self::$_PHEX = array(
+				'VERSION' => self::$VERSION,
+				'AUTOLOAD' => "autoload/"
+			);
 		}
 	}
 	
 	/**
 	
 	**/
-	public function isGET()
+	static function __callStatic($method, $arguments) {
+		
+	}
+	
+	/**
+		Move next 4 methods into __call method
+	**/
+	static function routeGET($req_route, $callback)
+	{
+		if($_SERVER['REQUEST_METHOD'] == "GET")
+		{
+			self::route($req_route, $callback);
+		}
+	}
+	
+	/**
+	
+	**/
+	static function isGET()
 	{
 		return $_SERVER['REQUEST_METHOD'] == "GET" ? true : false;
 	}
@@ -45,7 +49,7 @@ class phex
 	/**
 	
 	**/
-	public function isPOST()
+	static function isPOST()
 	{
 		return $_SERVER['REQUEST_METHOD'] == "POST" ? true : false;
 	}
@@ -53,20 +57,20 @@ class phex
 	/**
 	
 	**/
-	public function routePOST($req_route, $callback)
+	static function routePOST($req_route, $callback)
 	{
 		if($_SERVER['REQUEST_METHOD'] == "POST")
 		{
-			$this->route($req_route, $callback);
+			self::route($req_route, $callback);
 		}
 	}
 	
 	/**
 	
 	**/
-	public function route($req_route, $callback)
+	static function route($req_route, $callback)
 	{
-		if(isset($this->_ROUTES[0]) && isset($this->_ROUTES[0]['CALLBACK']))
+		if(isset(self::$_ROUTES[0]) && isset(self::$_ROUTES[0]['CALLBACK']))
 		{
 			/*
 			* Still exists an exact match route, we can skip all others.
@@ -82,8 +86,8 @@ class phex
 			}
 			else
 			{
-				$this->_ROUTES[0]['CALLBACK'] = $callback;
-				$this->_ROUTES[0]['PARAMS'] = null;
+				self::$_ROUTES[0]['CALLBACK'] = $callback;
+				self::$_ROUTES[0]['PARAMS'] = null;
 			}
 		}
 		else
@@ -108,8 +112,8 @@ class phex
 						$candidate_route[substr($token_route,1,strlen($token_route))] = $token_uri;
 					}
 				}
-				$this->_ROUTES[$num_parameters]['PARAMS'] = $candidate_route; // Should save also some other data
-				$this->_ROUTES[$num_parameters]['CALLBACK'] = $callback;
+				self::$_ROUTES[$num_parameters]['PARAMS'] = $candidate_route; // Should save also some other data
+				self::$_ROUTES[$num_parameters]['CALLBACK'] = $callback;
 			}
 			else
 			{
@@ -122,17 +126,18 @@ class phex
 	/**
 	
 	**/
-	public function run()
+	static function run()
 	{
+		self::load();
 		global $_PHEX;
-		$_PHEX =& $this->_PHEX;
+		$_PHEX =& self::$_PHEX;
 		
-		if(sizeof($this->_ROUTES) == 0)
+		if(sizeof(self::$_ROUTES) == 0)
 		{
-			$this->error(404);
+			self::error(404);
 		}
 		
-		$autoloads = explode(",", $this->_PHEX['AUTOLOAD']);
+		$autoloads = explode(",", self::$_PHEX['AUTOLOAD']);
 		$al_paths = array();
 		foreach($autoloads as $autoload)
 		{
@@ -149,9 +154,9 @@ class phex
 		spl_autoload_extensions(".php");
 		spl_autoload_register();
 		
-		ksort($this->_ROUTES);
-		$_PHEX['ROUTES'] = $this->_ROUTES;
-		foreach($this->_ROUTES as $route)
+		ksort(self::$_ROUTES);
+		$_PHEX['ROUTES'] = self::$_ROUTES;
+		foreach(self::$_ROUTES as $route)
 		{
 			$callbacks = $route['CALLBACK'];
 			if(is_object($callbacks) && ($callbacks instanceof Closure))
@@ -168,7 +173,7 @@ class phex
 				foreach($callbacks as $callback)
 				{
 					$callback = trim($callback);
-					$this->launchCallback($callback);
+					self::launchCallback($callback);
 				}
 			}
 			
@@ -180,21 +185,29 @@ class phex
 	/**
 	
 	**/
-	private function launchCallback($callback)
+	static function launchCallback($callback)
 	{
-		if(is_callable($callback))
+		if(substr($callback,0,1) == "$" && strpos($callback, "::") > 0)
 		{
-			eval($callback."();");
+			trigger_error("Can't call static method on instanced object");
+		}
+		elseif(is_callable($callback))
+		{
+			eval($callback."();");	
 		}
 		elseif(strpos($callback, "->") > 0)
 		{
 			$calldata = explode("->", $callback);
 			$callclass = $calldata[0];
 			$callmethod = $calldata[1];
-			if (substr($callclass,0,1) == "$")
+			if(substr($callclass,0,1) == "$")
 			{
 				eval("global ".$callclass.";");
 				$var = eval("return ".$callclass.";");
+				if (!is_object($var))
+				{
+					trigger_error("Called method on non-existing object");
+				}
 			}
 			else
 			{
@@ -204,20 +217,19 @@ class phex
 		}
 		else
 		{
-			// Count the callbacks correctly run and give 404 only if no callback have been executed
-			$this->error(404);
+			trigger_error("Invalid callback");
 		}
 	}
 	
 	/**
-		If flush is true and the item is stored persistent it will be deleted after being retrieved.
+		Retrieve saved var
 			@param item string
 	**/
-	public function get($item)
+	static function get($item)
 	{
-		if (isset($this->_PHEX[$item]))
+		if (isset(self::$_PHEX[$item]))
 		{
-			return $this->_PHEX[$item];
+			return self::$_PHEX[$item];
 		}
 		else
 		{
@@ -226,19 +238,19 @@ class phex
 	}
 	
 	/**
-		If $ttl is more than 0 the value will be stored persistently for the amount of time specified.
+		Set var
 			@param item string
 			@param value mixed
 	**/
-	public function set($item, $value)
+	static function set($item, $value)
 	{
-		$this->_PHEX[$item] = $value;
+		self::$_PHEX[$item] = $value;
 	}
 	
 	/**
 	
 	**/
-	public function error($code)
+	static function error($code)
 	{
 		switch($code)
 		{

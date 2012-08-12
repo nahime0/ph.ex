@@ -26,11 +26,10 @@ function test()
 $ciccio = new prova();
 
 
-$phex = new phex();
-$phex->route("/", '\nested\example2::test');
-$phex->route("/@test1/ciao/test2", function() {echo "TUTTO OK";});
-$phex->route("/@test1/@plutone/@test2", 'test');
-$phex->route("/@test1/ciao/@test2", 'test');
-$phex->run();
+phex::route("/", '\nested\example2::test');
+phex::route("/@test1/ciao/test2", function() {echo "TUTTO OK";});
+phex::route("/@test1/@plutone/@test2", 'test');
+phex::route("/@test1/ciao/@test2", 'test');
+phex::run();
 
 ?>
