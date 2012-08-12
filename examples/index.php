@@ -25,9 +25,8 @@ function test()
 
 $ciccio = new prova();
 
-
-phex::route("/", '\nested\example2::test');
-phex::route("/@test1/ciao/test2", function() {echo "TUTTO OK";});
+phex::routeGET("/", array('\nested\example2::test', function() {echo "TUTTO OK";}));
+phex::route("/@test1/ciao/test2", '$ciccio->call');
 phex::route("/@test1/@plutone/@test2", 'test');
 phex::route("/@test1/ciao/@test2", 'test');
 phex::run();

@@ -3,13 +3,14 @@
 class phex
 {
 	
-	static $VERSION = "0.0.1";
-	static $_PHEX;
-	static $_ROUTES;
-	static $loaded = false;
+	private static $VERSION = "0.0.1";
+	private static $ACCEPTED_METHODS = array("GET", "POST");
+	private static $_PHEX;
+	private static $_ROUTES;
+	private static $loaded = false;
 	
 	
-	public function load()
+	private static function load()
 	{
 		if(!self::$loaded)
 		{
@@ -17,58 +18,40 @@ class phex
 				'VERSION' => self::$VERSION,
 				'AUTOLOAD' => "autoload/"
 			);
+			self::$loaded = true;
 		}
 	}
 	
 	/**
-	
+		Provides isMETHOD and routeMETHOD.
+		METHOD could be one of the defined http ACCEPTED_METHODS
 	**/
-	static function __callStatic($method, $arguments) {
-		
-	}
-	
-	/**
-		Move next 4 methods into __call method
-	**/
-	static function routeGET($req_route, $callback)
-	{
-		if($_SERVER['REQUEST_METHOD'] == "GET")
+	public static function __callStatic($method, $arguments) {
+		if(substr($method,0,2) == "is" && 
+			in_array(
+				substr($method,2,strlen($method)), 
+				self::$ACCEPTED_METHODS))
 		{
-			self::route($req_route, $callback);
+			$http_method = substr($method,2,strlen($method));
+			return $http_method == $_SERVER['REQUEST_METHOD'] ? true : false;
 		}
-	}
-	
-	/**
-	
-	**/
-	static function isGET()
-	{
-		return $_SERVER['REQUEST_METHOD'] == "GET" ? true : false;
-	}
-	
-	/**
-	
-	**/
-	static function isPOST()
-	{
-		return $_SERVER['REQUEST_METHOD'] == "POST" ? true : false;
-	}
-	
-	/**
-	
-	**/
-	static function routePOST($req_route, $callback)
-	{
-		if($_SERVER['REQUEST_METHOD'] == "POST")
+		elseif(substr($method,0,5) == "route" && 
+			in_array(
+				substr($method,5,strlen($method)), 
+				self::$ACCEPTED_METHODS))
 		{
-			self::route($req_route, $callback);
-		}
+			$http_method = substr($method,5,strlen($method));
+			if ($http_method == $_SERVER['REQUEST_METHOD'])
+			{
+				self::route($arguments[0], $arguments[1]);
+			}
+		} 
 	}
 	
 	/**
 	
 	**/
-	static function route($req_route, $callback)
+	public static function route($req_route, $callback)
 	{
 		if(isset(self::$_ROUTES[0]) && isset(self::$_ROUTES[0]['CALLBACK']))
 		{
@@ -126,7 +109,7 @@ class phex
 	/**
 	
 	**/
-	static function run()
+	public static function run()
 	{
 		self::load();
 		global $_PHEX;
@@ -172,8 +155,15 @@ class phex
 			{
 				foreach($callbacks as $callback)
 				{
-					$callback = trim($callback);
-					self::launchCallback($callback);
+					if(is_object($callback) && ($callback instanceof Closure))
+					{
+						$callback();
+					}
+					else
+					{
+						$callback = trim($callback);
+						self::launchCallback($callback);
+					}
 				}
 			}
 			
@@ -185,35 +175,42 @@ class phex
 	/**
 	
 	**/
-	static function launchCallback($callback)
+	private static function launchCallback($callback)
 	{
-		if(substr($callback,0,1) == "$" && strpos($callback, "::") > 0)
-		{
-			trigger_error("Can't call static method on instanced object");
-		}
-		elseif(is_callable($callback))
+		if(is_callable($callback))
 		{
 			eval($callback."();");	
 		}
 		elseif(strpos($callback, "->") > 0)
 		{
-			$calldata = explode("->", $callback);
-			$callclass = $calldata[0];
-			$callmethod = $calldata[1];
-			if(substr($callclass,0,1) == "$")
+			try
 			{
-				eval("global ".$callclass.";");
-				$var = eval("return ".$callclass.";");
-				if (!is_object($var))
+				$calldata = explode("->", $callback);
+				$callclass = $calldata[0];
+				$callmethod = $calldata[1];
+				if(substr($callclass,0,1) == "$")
 				{
-					trigger_error("Called method on non-existing object");
+					eval("global ".$callclass.";");
+					$var = eval("return ".$callclass.";");
+					if (!is_object($var))
+					{
+						throw new Exception('Cannot find declared object: '.$callclass);
+					}
 				}
+				else
+				{
+					if(!class_exists($callclass))
+					{
+						throw new Exception('Cannot load class: '.$callclass);
+					}
+					$var = new $callclass();					
+				}
+				$var->$callmethod();
 			}
-			else
-			{
-				$var = new $callclass();
+			catch(Exception $e) {
+				trigger_error($e->getMessage());
+				return;
 			}
-			$var->$callmethod();
 		}
 		else
 		{
@@ -225,7 +222,7 @@ class phex
 		Retrieve saved var
 			@param item string
 	**/
-	static function get($item)
+	public static function get($item)
 	{
 		if (isset(self::$_PHEX[$item]))
 		{
@@ -242,7 +239,7 @@ class phex
 			@param item string
 			@param value mixed
 	**/
-	static function set($item, $value)
+	public static function set($item, $value)
 	{
 		self::$_PHEX[$item] = $value;
 	}
@@ -250,7 +247,7 @@ class phex
 	/**
 	
 	**/
-	static function error($code)
+	public static function error($code)
 	{
 		switch($code)
 		{
