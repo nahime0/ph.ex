@@ -8,12 +8,12 @@
 	http://www.vincenzopetrucci.it/ph.ex/
 	https://github.com/nahime/ph.ex
 	
-		@version 0.0.1
+		@version 0.0.2
 **/
 
 class phex
 {
-	private static $P = array();
+	public static $P = array();
 
 	/**
 		Provides isMETHOD and routeMETHOD.
@@ -36,17 +36,38 @@ class phex
 			$http_method = substr($method,5,strlen($method));
 			if ($http_method == $_SERVER['REQUEST_METHOD'])
 			{
-				self::route($arguments[0], $arguments[1]);
+				self::route($arguments[0], $arguments[1], $arguments[2]);
 			}
 		}
 	}
 
 	/**
+		Loads vars from ini file
+			@param $file string
+	**/
+	static function config($file)
+	{
+		if(is_file($file))
+		{
+			$d = parse_ini_file($file);
+			foreach($d as $k => $v)
+			{
+				self::set($k, $v);
+			}
+		}
+		else
+		{
+			trigger_error("Non existing config file");
+		}
+	}
+
+	/**
 		Define a route
+			@param $name string
 			@param $route string
 			@param $callback mixed
 	**/
-	static function route($route, $callback)
+	static function route($name, $route, $callback)
 	{
 		if(isset(self::$P['ROUTES'][0]) && isset(self::$P['ROUTES'][0]['CALLBACK']))
 		{
@@ -59,6 +80,7 @@ class phex
 		{
 			if($_SERVER['REQUEST_URI'] == $route)
 			{
+				self::$P['ROUTES'][0]['NAME'] = $name;
 				self::$P['ROUTES'][0]['CALLBACK'] = $callback;
 				self::$P['ROUTES'][0]['PARAMS'] = null;
 			}
@@ -84,6 +106,7 @@ class phex
 						$candidate_route[substr($token_route,1,strlen($token_route))] = $token_uri;
 					}
 				}
+				self::$P['ROUTES'][$n_pars]['NAME'] = $name; 
 				self::$P['ROUTES'][$n_pars]['PARAMS'] = $candidate_route; // Should save also some other data
 				self::$P['ROUTES'][$n_pars]['CALLBACK'] = $callback;
 			}
@@ -187,7 +210,7 @@ class phex
 					}
 				}
 			} /* if(is_array($callbacks)) */
-			$P['ROUTE'] = $route;
+			self::$P['ROUTE'] = $route;
 			break;
 		} /* foreach(self::$P['ROUTES] as $route) */
 		$response = ob_get_clean();
@@ -205,14 +228,6 @@ class phex
 				self::$P[\''.str_replace('.','\'][\'', $item).'\'] :
 				null;
 		');
-		if (isset(self::$P[$item]))
-		{
-			return self::$P[$item];
-		}
-		else
-		{
-			return null;
-		}
 	}
 
 	/**
@@ -261,6 +276,6 @@ class phex
 	Default configuration
 **/
 phex::set('AUTOLOAD', 'autoload/');
-phex::set('VERSION', '0.0.1');
+phex::set('VERSION', '0.0.2');
 phex::set('ACCEPTED_METHODS', array('GET', 'POST'));
 ?>
