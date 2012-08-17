@@ -69,6 +69,7 @@ class phex
 	**/
 	static function route($name, $route, $callback)
 	{
+		self::$P['URLS'][$name] = str_replace('@', '?', $route);
 		if(isset(self::$P['ROUTES'][0]) && isset(self::$P['ROUTES'][0]['CALLBACK']))
 		{
 			/*
