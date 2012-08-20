@@ -126,6 +126,8 @@ class phex
 
 	/**
 		Starts the system
+		Implement call function and run it with callback arguments
+		call must work also with files.
 	**/
 	static function run()
 	{
@@ -133,19 +135,21 @@ class phex
 		{
 			self::error(404);
 		}
-		$autoloads = explode(",", self::$P['AUTOLOAD']);
+		$autoloads = explode(";", self::$P['AUTOLOAD']);
 		$al_paths = array();
 		foreach($autoloads as $autoload)
 		{
-			$autoload = trim($autoload);
-			if(strlen($autoload) > 0)
-			{
-				$al_paths[] = $autoload;
-			}
+			$al_paths[] = trim($autoload);
 		}
 		if(sizeof($al_paths) > 0)
 		{
-			set_include_path(get_include_path().PATH_SEPARATOR.implode(PATH_SEPARATOR, $al_paths));
+			set_include_path(
+				get_include_path().
+				PATH_SEPARATOR.
+				implode(PATH_SEPARATOR, $al_paths).
+				PATH_SEPARATOR.
+				str_replace('phex.php', '', __FILE__)."mods/"
+			);
 		}
 		spl_autoload_extensions(".php");
 		spl_autoload_register();
@@ -276,7 +280,7 @@ class phex
 /**
 	Default configuration
 **/
-phex::set('AUTOLOAD', 'autoload/');
+phex::set('AUTOLOAD', '');
 phex::set('VERSION', '0.0.2');
 phex::set('ACCEPTED_METHODS', array('GET', 'POST'));
 ?>
